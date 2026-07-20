@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "greentracker"
+version = "0.1.0"
+description = "Monitor de consumo energético y huella de carbono para desarrollo de software (prototipo de tesis ICCI)"
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Miguel Muñoz Lucero" }]
+dependencies = [
+    "codecarbon>=2.8",
+    "psutil>=5.9",
+    "textual>=0.80",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+greentracker = "greentracker.cli:app"
+gtrack = "greentracker.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
