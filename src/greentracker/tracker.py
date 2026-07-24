@@ -150,6 +150,12 @@ class GreenTracker:
             save_to_file=False,  # el CSV canónico lo escribe GreenTracker
             log_level="error",
         )
+        # opciones de medición de RAM: solo se pasan si el usuario las activa,
+        # para mantener compatibilidad con versiones previas de codecarbon
+        if self.config.force_ram_power is not None:
+            kwargs["force_ram_power"] = self.config.force_ram_power
+        if self.config.rapl_include_dram:
+            kwargs["rapl_include_dram"] = True
         try:
             return OfflineEmissionsTracker(allow_multiple_runs=True, **kwargs)
         except TypeError:  # versiones de codecarbon sin allow_multiple_runs

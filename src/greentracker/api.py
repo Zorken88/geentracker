@@ -95,6 +95,8 @@ def track(
     carbon_intensity: float = DEFAULT_CARBON_INTENSITY,
     electricity_cost_clp: float = DEFAULT_ELECTRICITY_COST_CLP,
     csv_file: str | Path = DEFAULT_CSV_FILE,
+    force_ram_power: float | None = None,
+    rapl_include_dram: bool = False,
 ) -> Iterator[GreenTracker]:
     """Mide el consumo energético y la huella de carbono del bloque ``with``.
 
@@ -108,6 +110,11 @@ def track(
         electricity_cost_clp: tarifa eléctrica CLP/kWh (extensión, no modelo).
         csv_file: ruta del CSV de sesiones (por defecto ``emissions.csv``
             en el directorio actual, igual que el CLI).
+        force_ram_power: potencia fija de RAM en watts; reemplaza el modelo
+            de estimación de codecarbon (útil si se conoce el consumo real).
+        rapl_include_dram: en Linux con dominio RAPL ``dram`` (mayormente
+            Intel), suma la energía real de memoria dentro del componente
+            CPU. Sin efecto si el hardware no expone ese dominio (ej. AMD).
 
     Yields:
         La instancia de :class:`GreenTracker`. Durante el bloque expone
@@ -121,6 +128,8 @@ def track(
         carbon_intensity=carbon_intensity,
         electricity_cost_clp=electricity_cost_clp,
         csv_file=Path(csv_file),
+        force_ram_power=force_ram_power,
+        rapl_include_dram=rapl_include_dram,
     )
     tracker = GreenTracker(config, process_manager=_CurrentProcess())
     tracker.start_tracking()

@@ -137,3 +137,40 @@ def test_stop_is_idempotent(make_tracker):
 def test_custom_carbon_intensity(make_tracker):
     summary = run_session(make_tracker(carbon_intensity=0.5))
     assert summary.emissions == pytest.approx(0.010 * 0.5)
+
+
+def test_ram_options_reach_codecarbon(tmp_path, monkeypatch):
+    """--ram-power / --rapl-dram deben llegar como kwargs a codecarbon."""
+    import codecarbon
+
+    captured = {}
+
+    class FakeOET:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(codecarbon, "OfflineEmissionsTracker", FakeOET)
+    config = TrackerConfig(
+        command="true", project="demo", csv_file=tmp_path / "e.csv",
+        force_ram_power=8.0, rapl_include_dram=True,
+    )
+    GreenTracker(config)._create_cc_tracker()
+    assert captured["force_ram_power"] == 8.0
+    assert captured["rapl_include_dram"] is True
+
+
+def test_ram_options_off_by_default(tmp_path, monkeypatch):
+    """Sin opt-in no se pasan kwargs extra (compatibilidad y comparabilidad)."""
+    import codecarbon
+
+    captured = {}
+
+    class FakeOET:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(codecarbon, "OfflineEmissionsTracker", FakeOET)
+    config = TrackerConfig(command="true", project="demo", csv_file=tmp_path / "e.csv")
+    GreenTracker(config)._create_cc_tracker()
+    assert "force_ram_power" not in captured
+    assert "rapl_include_dram" not in captured

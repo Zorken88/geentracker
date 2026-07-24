@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "greentracker"
 version = "0.1.0"
 description = "Monitor de consumo energético y huella de carbono para desarrollo de software (prototipo de tesis ICCI)"
-license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Miguel Muñoz Lucero" }]
@@ -27,6 +26,11 @@ gtrack = "greentracker.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# estilos de la TUI (Textual): sin esto, pip instala el paquete sin los .tcss
+# y la TUI falla al cargar el stylesheet en instalaciones no-editables
+greentracker = ["tui/styles/*.tcss"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

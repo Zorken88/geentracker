@@ -12,14 +12,14 @@ Lanza cualquier aplicación en desarrollo (Node.js, .NET, Java, Python, etc.) co
   - macOS: `brew install python@3.13` (o desde [python.org](https://www.python.org/downloads/))
   - Linux (Debian/Ubuntu): `sudo apt install python3 python3-venv python3-pip`
   - Windows: instalador de [python.org](https://www.python.org/downloads/) (marcar *"Add Python to PATH"*)
-- El código fuente del prototipo (esta carpeta, `proyecto_titulo`).
+- El código fuente del prototipo: `git clone https://github.com/Zorken88/greentracker.git` (o esta carpeta, si ya se tiene).
 
 ### 2. Instalación (una sola vez)
 
 #### macOS / Linux
 
 ```bash
-cd proyecto_titulo
+cd greentracker
 python3 -m venv .venv                 # crear entorno virtual
 source .venv/bin/activate             # activar el entorno
 pip install -e ".[dev]"               # instalar GreenTracker y dependencias
@@ -28,7 +28,7 @@ pip install -e ".[dev]"               # instalar GreenTracker y dependencias
 #### Windows (PowerShell)
 
 ```powershell
-cd proyecto_titulo
+cd greentracker
 python -m venv .venv                  # crear entorno virtual
 .venv\Scripts\Activate.ps1            # activar el entorno
 pip install -e ".[dev]"               # instalar GreenTracker y dependencias
@@ -47,15 +47,15 @@ La instalación registra los comandos `greentracker` y `gtrack` dentro del entor
 ```bash
 cd ~/proyectos/mi-api                      # el proyecto A MEDIR
 source .venv/bin/activate                  # su propio venv
-pip install git+https://github.com/<usuario>/proyecto_titulo.git   # desde git
-# o, si se tiene el código local:  pip install /ruta/a/proyecto_titulo
+pip install git+https://github.com/Zorken88/greentracker.git       # desde git
+# o, si se tiene el código local:  pip install /ruta/a/greentracker
 gtrack run "python main.py"                # python = el del proyecto ✔
 ```
 
 Para proyectos **no-Python** (Node.js, Java, .NET…) en un equipo nuevo, la forma más cómoda es [pipx](https://pipx.pypa.io) — instala el CLI una sola vez, aislado y disponible globalmente:
 
 ```bash
-pipx install git+https://github.com/<usuario>/proyecto_titulo.git
+pipx install git+https://github.com/Zorken88/greentracker.git
 cd ~/proyectos/mi-app-node
 gtrack run "npm run dev"
 ```
@@ -71,12 +71,12 @@ En **cada terminal nueva** se activa primero el entorno virtual y luego se naveg
 
 ```bash
 # macOS / Linux
-source /ruta/a/proyecto_titulo/.venv/bin/activate
+source /ruta/a/greentracker/.venv/bin/activate
 cd ~/proyectos/mi-api                 # ir al proyecto A MEDIR
 gtrack run "npm run dev"              # lanzar y trackear
 
 # Windows (PowerShell)
-\ruta\a\proyecto_titulo\.venv\Scripts\Activate.ps1
+\ruta\a\greentracker\.venv\Scripts\Activate.ps1
 cd $HOME\proyectos\mi-api
 gtrack run "npm run dev"
 ```
@@ -128,9 +128,76 @@ print(r.seu_component)     # SEU: componente de mayor consumo
 print(r.measurement_mode)  # PowerMetrics / RAPL / TDP...
 ```
 
-Parámetros opcionales de `track()`: `interval` (s entre muestras), `carbon_intensity` (kgCO₂eq/kWh, por defecto 0.245 HuellaChile), `electricity_cost_clp` y `csv_file`. Durante el bloque, `session.latest` expone el último snapshot en vivo.
-
 Las sesiones de librería se persisten en el **mismo `emissions.csv`** que el CLI, por lo que la línea base, `gtrack dashboard` y `gtrack baseline` funcionan igual sobre ellas. En este modo el aspecto medido es el **proceso Python anfitrión** (más sus hijos); el proceso nunca es terminado por GreenTracker.
+
+#### Parámetros de `track()`
+
+| Parámetro | Por defecto | Descripción |
+|---|---|---|
+| `project` | nombre del directorio actual | Agrupa la línea base y el historial del proyecto |
+| `label` | `"[librería] proceso actual"` | Descripción de la sesión (columna `command` del CSV) |
+| `interval` | `2.0` | Segundos entre muestras |
+| `carbon_intensity` | `0.245` | Factor de emisión kgCO₂eq/kWh (SEN — HuellaChile, MMA 2024) |
+| `electricity_cost_clp` | `150.0` | Tarifa eléctrica CLP/kWh (extensión, no modelo) |
+| `csv_file` | `emissions.csv` | Ruta del CSV de sesiones (relativa al directorio actual) |
+
+#### Durante el bloque `with` — `session.latest` (MetricSnapshot en vivo)
+
+Snapshot actualizado en cada intervalo (puede ser `None` durante el primer muestreo):
+
+| Campo | Unidad | Descripción |
+|---|---|---|
+| `cpu_percent` / `ram_used_mb` | % / MB | Uso agregado del árbol de procesos |
+| `cpu_power_w` / `gpu_power_w` / `ram_power_w` / `total_power_w` | W | Potencia instantánea por componente |
+| `cpu_energy_kwh` / `gpu_energy_kwh` / `ram_energy_kwh` / `energy_kwh` | kWh | Energía acumulada por componente y total |
+| `emissions_kg_co2eq` | kgCO₂eq | Huella acumulada (propiedad `emissions_g_co2eq` = ×1000) |
+| `seu_component` | — | Componente dominante hasta el momento |
+| `disk_read_mb_s` / `disk_write_mb_s` | MB/s | E/S de disco (extensión) |
+| `child_processes` / `duration_s` / `cost_clp` | — | Hijos, segundos transcurridos, costo CLP |
+
+También está disponible `session.tracking_active` (bool).
+
+#### Al salir del bloque — `session.summary` (SessionSummary, la fila persistida)
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `timestamp` | str | Fecha/hora ISO del cierre de la sesión |
+| `session_id` | str | Identificador de 8 caracteres |
+| `project` | str | Nombre del proyecto |
+| `command` | str | Comando medido (en librería: el `label`) |
+| `duration_s` | float | Duración en segundos |
+| `cpu_energy` / `gpu_energy` / `ram_energy` | float (kWh) | Energía por componente (Tabla 15) |
+| `energy_consumed` | float (kWh) | **Energía total — EnPI (ISO 50001)** |
+| `emissions` | float (kgCO₂eq) | **Huella de carbono — Ecuación 3: HC = E × I** |
+| `carbon_intensity` | float | Factor de emisión usado en el cálculo |
+| `measurement_mode` | str | `PowerMetrics` / `RAPL` / `Power Gadget` / `TDP constant` / `TDP cpu_load` |
+| `seu_component` | str | **SEU (ISO 50001)**: `"CPU"`, `"GPU"` o `"RAM"` |
+| `seu_breakdown` | str | Desglose, ej. `"CPU 79% \| RAM 21% \| GPU 0%"` |
+| `is_baseline` | bool | `True` si la sesión quedó como línea base ⭐ del proyecto |
+| `cost_clp` | float | Costo eléctrico estimado en CLP (extensión) |
+
+Tanto `summary` como `latest` exponen **`.to_row()`**, que devuelve un `dict` listo para serializar (JSON, pandas, logging…):
+
+```python
+import json
+
+fila = session.summary.to_row()      # dict con las columnas del CSV
+print(json.dumps(fila, indent=2))
+```
+
+#### Comparación contra la línea base — `session.baseline_comparison`
+
+Si la sesión **no** es la línea base, tras el bloque queda disponible un `dict` (si no hay línea base previa, es `None`):
+
+```python
+{
+    "baseline_session_id": "66b87ddb",   # sesión ⭐ de referencia
+    "energy_delta_pct": -12.4,           # Δ% de energía vs línea base
+    "emissions_delta_pct": -12.4,        # Δ% de huella vs línea base
+}
+```
+
+Un delta negativo significa que esta sesión consumió/emitió **menos** que la línea base (mejora continua, ISO 50001).
 
 ### Modos de medición y permisos por plataforma
 
@@ -175,6 +242,33 @@ cat /sys/class/powercap/intel-rapl:0/energy_uj
 
 Con acceso a RAPL, `measurement_mode = RAPL` — es la plataforma de mayor fidelidad para la validación experimental, con medición real de CPU desde sensores sin software adicional.
 
+#### La RAM: modelo de estimación vs medición real
+
+A diferencia de la CPU, **la RAM no se mide con sensores por defecto en ninguna plataforma**: CodeCarbon la *estima* con un modelo por capacidad/DIMM que aplica un piso de potencia (~3 W en ARM, ~10 W en x86). Consecuencias: la energía de RAM escala con la duración de la sesión (no con el uso real) y en sesiones largas el SEU tiende a sesgarse hacia RAM — especialmente visible en Linux x86.
+
+GreenTracker expone las dos opciones que ofrece CodeCarbon (≥ 3.0) para mejorar esto, ambas **opt-in**:
+
+```bash
+# 1) Potencia de RAM fija y conocida (reemplaza el modelo de estimación).
+#    Regla de codecarbon: nº de DIMMs × 5 W  (ver DIMMs: sudo lshw -C memory -short | grep DIMM)
+gtrack run --ram-power 10 "python main.py"
+
+# 2) Linux con dominio RAPL "dram": sumar la energía REAL de memoria a la medición RAPL
+gtrack run --rapl-dram "python main.py"
+```
+
+En la librería: `greentracker.track(..., force_ram_power=10)` o `track(..., rapl_include_dram=True)`.
+
+Letra chica de `--rapl-dram`:
+
+- Solo funciona si el equipo **expone el dominio `dram` en RAPL** — principalmente procesadores Intel (sobre todo Xeon/servidores). Verificar con:
+  ```bash
+  cat /sys/class/powercap/intel-rapl*/name /sys/class/powercap/intel-rapl*/*/name 2>/dev/null | grep -i dram
+  ```
+  Si no aparece nada (caso típico en AMD, ej. Ryzen 4700U), la opción **no tiene efecto**.
+- La energía DRAM medida se suma **dentro del componente CPU** (medición RAPL "CPU+DRAM"); la columna `ram_energy` del CSV sigue siendo el modelo de estimación. Evitar sumar ambos como si fueran independientes.
+- Regla de siempre: **solo comparar sesiones con la misma configuración de medición** (es parte de lo que registra `measurement_mode`).
+
 #### Windows
 
 El procesador Intel tiene contadores RAPL, pero Windows no los expone nativamente; el puente era **Intel Power Gadget**, descontinuado por Intel en 2023. En la práctica, en Windows CodeCarbon opera por estimación (`TDP constant`/`cpu_load`). GPU NVIDIA sí se mide vía NVML si hay driver instalado.
@@ -184,7 +278,7 @@ En las tres plataformas la herramienta funciona **100% offline** y el cálculo d
 ### Limitaciones conocidas (relevantes para validez experimental)
 
 - **Efecto observador**: en modo `process`, CodeCarbon mide el árbol de procesos completo de GreenTracker, que incluye a la propia herramienta (Python + Textual) además de la app medida. El overhead es aproximadamente constante entre sesiones, por lo que los **deltas vs línea base siguen siendo válidos**; los valores absolutos incluyen al instrumento.
-- **RAM en modo estimación**: el modelo de CodeCarbon aplica un piso de potencia (3 W en ARM, 10 W en x86), por lo que la energía RAM estimada escala con la duración de la sesión, no con el uso real. Comparar sesiones de duración similar, o usar sensores.
+- **RAM en modo estimación**: el modelo de CodeCarbon aplica un piso de potencia (3 W en ARM, 10 W en x86), por lo que la energía RAM estimada escala con la duración de la sesión, no con el uso real. Comparar sesiones de duración similar, fijar `--ram-power` con un valor conocido, o usar `--rapl-dram` en hardware Intel con dominio DRAM (ver *La RAM: modelo de estimación vs medición real*).
 - **Duración de sesiones**: al comparar contra la línea base, usar sesiones de duración comparable para que los componentes de consumo fijo se cancelen en el delta.
 
 ## Cumplimiento del modelo de calidad

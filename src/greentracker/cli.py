@@ -64,6 +64,13 @@ def run(
     file: Path = typer.Option(Path(DEFAULT_CSV_FILE), "--file", "-f", help="Archivo CSV de sesiones."),
     manual: bool = typer.Option(False, "--manual", help="El usuario controla el inicio del tracking (tecla T en la TUI)."),
     no_tui: bool = typer.Option(False, "--no-tui", help="Modo consola sin TUI (útil para CI/tests)."),
+    ram_power: float = typer.Option(
+        None, "--ram-power", help="Potencia fija de RAM en W (reemplaza el modelo de estimación; ver README)."
+    ),
+    rapl_dram: bool = typer.Option(
+        False, "--rapl-dram",
+        help="Linux/Intel: sumar el dominio DRAM del RAPL al componente CPU (requiere dominio 'dram'; ver README).",
+    ),
 ) -> None:
     """Ejecuta un comando y trackea su consumo energético y huella de carbono."""
     config = TrackerConfig(
@@ -74,6 +81,8 @@ def run(
         electricity_cost_clp=electricity_cost,
         csv_file=file,
         manual=manual,
+        force_ram_power=ram_power,
+        rapl_include_dram=rapl_dram,
     )
     from greentracker.tracker import GreenTracker
 
