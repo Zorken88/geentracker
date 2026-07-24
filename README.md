@@ -40,6 +40,31 @@ pip install -e ".[dev]"               # instalar GreenTracker y dependencias
 
 La instalación registra los comandos `greentracker` y `gtrack` dentro del entorno virtual, junto con las dependencias: CodeCarbon (medición energética), psutil (recursos y procesos) y Textual (TUI).
 
+### 2b. Instalación en el proyecto a medir (recomendado para proyectos Python)
+
+`greentracker` es un paquete pip estándar: puede instalarse directamente en el entorno virtual **del proyecto que se quiere medir** — sin clonar este repositorio ni crear su venv (los pasos 1-2 son solo para desarrollar GreenTracker):
+
+```bash
+cd ~/proyectos/mi-api                      # el proyecto A MEDIR
+source .venv/bin/activate                  # su propio venv
+pip install git+https://github.com/<usuario>/proyecto_titulo.git   # desde git
+# o, si se tiene el código local:  pip install /ruta/a/proyecto_titulo
+gtrack run "python main.py"                # python = el del proyecto ✔
+```
+
+Para proyectos **no-Python** (Node.js, Java, .NET…) en un equipo nuevo, la forma más cómoda es [pipx](https://pipx.pypa.io) — instala el CLI una sola vez, aislado y disponible globalmente:
+
+```bash
+pipx install git+https://github.com/<usuario>/proyecto_titulo.git
+cd ~/proyectos/mi-app-node
+gtrack run "npm run dev"
+```
+
+> [!IMPORTANT]
+> **Por qué importa (proyectos Python):** si se activa el venv de *GreenTracker* para obtener `gtrack` y luego se mide `python main.py`, ese `python` resuelve al intérprete del venv de GreenTracker — y el proyecto medido fallará por no encontrar **sus** dependencias. Instalar `greentracker` dentro del venv del proyecto medido (esta sección) hace que `gtrack` y `python` convivan en el mismo entorno.
+>
+> Para proyectos **no-Python** (Node.js, Java, .NET…) el problema no existe — `npm`, `java` o `dotnet` no dependen del venv activo — y sirve cualquiera de las dos formas de instalación.
+
 ### 3. Ejecutar una sesión de medición
 
 En **cada terminal nueva** se activa primero el entorno virtual y luego se navega hasta el proyecto que se desea medir:
@@ -55,6 +80,8 @@ gtrack run "npm run dev"              # lanzar y trackear
 cd $HOME\proyectos\mi-api
 gtrack run "npm run dev"
 ```
+
+> Para medir un **proyecto Python**, usar en su lugar el flujo de la sección 2b (instalar `greentracker` en el venv del propio proyecto).
 
 Consideraciones importantes:
 
@@ -83,6 +110,27 @@ gtrack baseline                      # línea base y EnPI del proyecto
 gtrack baseline --set <session_id>   # re-designar la línea base
 gtrack export --json                 # exportar historial a JSON
 ```
+
+### 5. Uso como librería Python
+
+Además del CLI, `greentracker` se puede **importar** para medir bloques de código desde el propio programa, sin subprocesos. Con el paquete instalado en el venv del proyecto (sección 2b):
+
+```python
+import greentracker
+
+with greentracker.track(project="mi-api", label="entrenamiento") as session:
+    entrenar_modelo()              # el código a medir
+
+r = session.summary
+print(r.energy_consumed)   # EnPI en kWh (ISO 50001)
+print(r.emissions)         # kgCO₂eq — Ecuación 3: HC = E × I
+print(r.seu_component)     # SEU: componente de mayor consumo
+print(r.measurement_mode)  # PowerMetrics / RAPL / TDP...
+```
+
+Parámetros opcionales de `track()`: `interval` (s entre muestras), `carbon_intensity` (kgCO₂eq/kWh, por defecto 0.245 HuellaChile), `electricity_cost_clp` y `csv_file`. Durante el bloque, `session.latest` expone el último snapshot en vivo.
+
+Las sesiones de librería se persisten en el **mismo `emissions.csv`** que el CLI, por lo que la línea base, `gtrack dashboard` y `gtrack baseline` funcionan igual sobre ellas. En este modo el aspecto medido es el **proceso Python anfitrión** (más sus hijos); el proceso nunca es terminado por GreenTracker.
 
 ### Modos de medición y permisos por plataforma
 

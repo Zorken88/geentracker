@@ -31,10 +31,14 @@ _BYTES_PER_MB = 1024 * 1024
 
 
 class GreenTracker:
-    def __init__(self, config: TrackerConfig) -> None:
+    def __init__(
+        self, config: TrackerConfig, process_manager: ProcessManager | None = None
+    ) -> None:
         self.config = config
         self.session_id = uuid.uuid4().hex[:8]
-        self.process = ProcessManager(config.command)
+        # process_manager inyectable: el CLI mide un subproceso; el modo
+        # librería (greentracker.api) mide el proceso anfitrión actual
+        self.process = process_manager if process_manager is not None else ProcessManager(config.command)
         self.csv_writer = CsvWriter(config.csv_file, config.timeline_file)
         self.baseline = BaselineManager(config.csv_file)
         self.is_baseline_session = self.baseline.is_first_session(config.project)
